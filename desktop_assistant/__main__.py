@@ -2,12 +2,12 @@
 import queue
 import threading
 
-from . import action_engine, asr, screenshot
+from . import action_engine, asr, feedback, screenshot
 from .audio import AudioPipeline
 from .tray import Tray
 
 
-def process_utterance(wav: bytes):
+def process_utterance(wav: bytes, icon=None):
     try:
         text = asr.transcribe(wav).strip()
     except Exception as e:
@@ -17,6 +17,8 @@ def process_utterance(wav: bytes):
         return
     print(f"[asr] {text!r}")
 
+    feedback.play_start()  # Task beginnt
+
     try:
         img = screenshot.capture_png()
         summary = action_engine.run_task(text, img)
@@ -24,8 +26,10 @@ def process_utterance(wav: bytes):
         print(f"[action] Fehler: {e}")
         return
 
-    if summary:
-        print(f"[agent] fertig: {summary}")
+    feedback.play_done()  # Task fertig
+    body = (summary or "").strip() or "Aufgabe erledigt"
+    feedback.notify("Task successful", body, icon=icon)
+    print(f"[agent] fertig: {body}")
 
 
 def main():
@@ -36,7 +40,12 @@ def main():
         task_q.put(wav)
 
     audio = AudioPipeline(on_utterance)
-    audio.start()
+
+    def on_quit():
+        stop.set()
+        audio.stop()
+
+    tray = Tray(audio, on_quit)
 
     def worker():
         while not stop.is_set():
@@ -44,15 +53,10 @@ def main():
                 wav = task_q.get(timeout=0.5)
             except queue.Empty:
                 continue
-            process_utterance(wav)
+            process_utterance(wav, icon=tray.icon)
 
+    audio.start()
     threading.Thread(target=worker, daemon=True, name="worker").start()
-
-    def on_quit():
-        stop.set()
-        audio.stop()
-
-    tray = Tray(audio, on_quit)
     tray.run()
 
 

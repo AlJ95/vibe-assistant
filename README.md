@@ -38,6 +38,13 @@ Silero-VAD-Modell (einmalig):
 Tray-Menü: **Aktiviert** (Checkbox, Default an) / **Beenden**. Icon-Farbe = Zustand
 (grün = aktiv, grau = deaktiviert).
 
+## Feedback (Töne + Toast)
+
+Genau zwei akustische Signale, sonst keine:
+
+- **Task-Start** (VAD hat Sprache erkannt, Aufgabe beginnt) → kurzer Ton (660 Hz)
+- **Task-Ende** (Aufgabe fertig) → höherer Ton (990 Hz) + Desktop-Toast „Task successful"
+
 ## Konfiguration (.env)
 
 | Variable | Default | Zweck |
@@ -75,4 +82,5 @@ Tray-Menü: **Aktiviert** (Checkbox, Default an) / **Beenden**. Icon-Farbe = Zus
       action_engine.py   DeepSeek V4 Vision + Tool-Calling
       executor.py        xdotool
       openrouter.py      requests-basierter Client (Retry)
+      feedback.py        Töne (Task-Start/Ende) + Toast (notify-send)
       tray.py            pystray
