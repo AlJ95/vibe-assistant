@@ -1,0 +1,24 @@
+# --- Secrets (NIEMALS committen) ---
+.env
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# --- Modelle (separat herunterladen, siehe README) ---
+models/*.onnx
+models/*.bin
+models/*.gguf
+
+# --- OS / Editor ---
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
