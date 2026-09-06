@@ -1,17 +1,17 @@
 # Vibe Assistant
 
 Voice → Desktop-Action Agent für Ubuntu (X11). Python-Paket: `desktop_assistant`. Dauerläufer mit Tray-Icon: nimmt 24/7 auf,
-erkennt per Silero-VAD Sprache, transkribiert über OpenRouter (Omni-Modell) und führt
-Desktop-Aktionen via DeepSeek V4 Vision (Tool-Calling) + xdotool aus.
+erkennt per Silero-VAD Sprache, transkribiert LOKAL über whisper.cpp (CUDA) und führt
+Desktop-Aktionen via GPT-6 Astra Pro (Tool-Calling) + xdotool aus.
 
 ## Datenfluss
 
-    Mikrofon → Capture (sounddevice) → VAD (Silero v5) → ASR (OpenRouter Omni)
-        → Screenshot + Action-Engine (DeepSeek V4 Vision) → Executor (xdotool) → Desktop
+    Mikrofon → Capture (sounddevice) → VAD (Silero v5) → ASR (lokal: whisper.cpp CUDA)
+        → Screenshot (JPEG, parallel zur ASR) + Action-Engine (GPT-6 Astra Pro) → Executor (xdotool) → Desktop
 
 - VAD läuft lokal (Silero ONNX, CPU < 1 %).
-- Bei erkannter Sprache: WAV-Segment → ASR (`input_audio`, Rekonstruktions-Prompt) → Text.
-- Bei JEDEM VLM-Call wird ein frischer Desktop-Screenshot mitgegeben (multimodal: Bild + Text).
+- Bei erkannter Sprache: WAV-Segment → ASR (lokal whisper.cpp; Fallback OpenRouter) → Text.
+- Bei JEDEM VLM-Call wird ein frischer Desktop-Screenshot (JPEG) mitgegeben (multimodal: Bild + Text).
 - Action-Engine antwortet als Tool-Call → Executor führt via xdotool aus.
 
 ## Voraussetzungen (System-Pakete)
@@ -31,9 +31,24 @@ Silero-VAD-Modell (einmalig):
     curl -sL -o models/silero_vad.onnx \
       https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx
 
+Whisper.cpp-Server für lokale ASR (einmalig bauen + Modell laden, siehe
+speech-to-paste-README; danach pro Sitzung starten):
+
+    ~/tools/whisper.cpp/build/bin/whisper-server \
+      -m ~/tools/whisper.cpp/models/ggml-large-v3-turbo-q8_0.bin \
+      --host 127.0.0.1 --port 8080
+
 ## Start
 
+    # 1) Whisper-Server (falls nicht schon aktiv)
+    ~/tools/whisper.cpp/build/bin/whisper-server \
+      -m ~/tools/whisper.cpp/models/ggml-large-v3-turbo-q8_0.bin \
+      --host 127.0.0.1 --port 8080 &
+
+    # 2) Assistant
     python -m desktop_assistant
+
+ASR-Fallback auf OpenRouter: `ASR_BACKEND=openrouter` in der .env setzen.
 
 Tray-Menü: **Aktiviert** (Checkbox, Default an) / **Beenden**. Icon-Farbe = Zustand
 (grün = aktiv, grau = deaktiviert).
@@ -49,14 +64,17 @@ Genau zwei akustische Signale, sonst keine:
 
 | Variable | Default | Zweck |
 |---|---|---|
-| `OPENROUTER_API_KEY` | — | API-Key |
-| `ASR_MODEL` | `meta/muse-spark-1.3` | Omni-Modell für Transkription |
-| `ACTION_MODEL` | `deepseek/deepseek-v4-flash-vision-exp` | Vision-Modell für Tool-Calling |
+| `OPENROUTER_API_KEY` | — | API-Key (nur für Action-Engine/Fallback) |
+| `ASR_BACKEND` | `local` | `local` = whisper.cpp-Server, `openrouter` = Cloud-Fallback |
+| `WHISPER_SERVER_URL` | `http://127.0.0.1:8080` | Adresse des lokalen whisper.cpp-Servers |
+| `ASR_MODEL` | `meta/muse-spark-1.3` | nur openrouter-Backend (Audio-fähig) |
+| `ACTION_MODEL` | `openai/gpt-6-astra-pro` | Vision-Modell für Tool-Calling |
 | `AUDIO_DEVICE` | leer (System-Default) | Aufnahmequelle (Index oder Name) |
 | `VAD_THRESHOLD` | `0.5` | Sprach-Schwelle |
-| `VAD_MIN_SILENCE_MS` | `600` | Ende-der-Äußerung-Hangover |
+| `VAD_MIN_SILENCE_MS` | `350` | Ende-der-Äußerung-Hangover |
 | `VAD_MAX_SPEECH_S` | `30` | Max. Äußerungslänge |
-| `SCREENSHOT_MAX_WIDTH` | `1920` | Downscale-Grenze für Screenshot |
+| `SCREENSHOT_MAX_WIDTH` | `1280` | JPEG-Breite (klein = schneller Prefill) |
+| `SCREENSHOT_QUALITY` | `80` | JPEG-Qualität |
 | `ALLOWED_COMMANDS` | leer | Whitelist-Präfixe für `run_command` (leer = blockiert) |
 
 ## Wichtige Hinweise
@@ -71,16 +89,27 @@ Genau zwei akustische Signale, sonst keine:
 - **Portabilität:** Aufnahmegerät wird automatisch erkannt (System-Default-Mic); `AUDIO_DEVICE`
   erlaubt Override. Screenshot: Linux `scrot`, sonst PIL `ImageGrab`.
 
+## Benchmarks / Latenz
+
+`benchmarks/` enthält ein Provider-agnostisches Latenz-Tool (Screenshot + Audio,
+OpenAI-kompatible Endpunkte): `benchmarks/latency_bench.py` + `README.md`.
+
+    uv run python benchmarks/latency_bench.py --config benchmarks/providers.example.json
+
 ## Struktur
 
     desktop_assistant/
       __main__.py        Einstieg (Audio-Thread + Worker + Tray)
       config.py          .env + alle Einstellungen
       audio.py           sounddevice + Silero-VAD (stateful v5)
-      asr.py             OpenRouter Omni → Text
-      screenshot.py      scrot / PIL
-      action_engine.py   DeepSeek V4 Vision + Tool-Calling
-      executor.py        xdotool
-      openrouter.py      requests-basierter Client (Retry)
+      asr.py             lokal whisper.cpp-Server (Fallback: OpenRouter Omni)
+      screenshot.py      scrot / PIL → JPEG + Klick-Skalierung
+      action_engine.py   GPT-6 Astra Pro + Tool-Calling (Mehrfach-Calls)
+      executor.py        xdotool (Klick-Koordinaten werden skaliert)
+      openrouter.py      requests-Session (keep-alive) + Retry
       feedback.py        Töne (Task-Start/Ende) + Toast (notify-send)
       tray.py            pystray
+    benchmarks/
+      latency_bench.py   Latenz-Messung (text/image/audio/image+audio)
+      providers.example.json
+      README.md

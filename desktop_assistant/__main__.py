@@ -1,4 +1,9 @@
-"""Einstieg: Audio-Pipeline (Thread) + Worker (ASR→Action) + Tray (Main-Loop)."""
+"""Einstieg: Audio-Pipeline (Thread) + Worker (ASR→Action) + Tray (Main-Loop).
+
+Latenz: Der Screenshot wird parallel zur ASR aufgenommen (ThreadPool), statt seriell
+danach — der Bildschirm ändert sich während der Transkription normalerweise nicht.
+"""
+import concurrent.futures
 import queue
 import threading
 
@@ -6,8 +11,15 @@ from . import action_engine, asr, feedback, screenshot
 from .audio import AudioPipeline
 from .tray import Tray
 
+_shot_pool = concurrent.futures.ThreadPoolExecutor(
+    max_workers=1, thread_name_prefix="screenshot"
+)
+
 
 def process_utterance(wav: bytes, icon=None):
+    # Screenshot JETZT parallel zur ASR aufnehmen (spart ~0.3-0.5 s serielle Latenz)
+    shot_future = _shot_pool.submit(screenshot.capture)
+
     try:
         text = asr.transcribe(wav).strip()
     except Exception as e:
@@ -20,8 +32,12 @@ def process_utterance(wav: bytes, icon=None):
     feedback.play_start()  # Task beginnt
 
     try:
-        img = screenshot.capture_png()
-        summary = action_engine.run_task(text, img)
+        img, sx, sy = shot_future.result(timeout=5)
+    except Exception:
+        img, sx, sy = screenshot.capture()  # Fallback: seriell
+
+    try:
+        summary = action_engine.run_task(text, img, scale=(sx, sy))
     except Exception as e:
         print(f"[action] Fehler: {e}")
         return

@@ -1,0 +1,54 @@
+{
+  "prompt": "Antworte mit genau einem Wort: OK",
+  "runs": 3,
+  "screenshot_max_width": 1280,
+  "screenshot_quality": 80,
+  "audio_seconds": 1.0,
+  "providers": [
+    {
+      "name": "openrouter-astra-pro",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "model": "openai/gpt-6-astra-pro",
+      "modes": ["text", "image"],
+      "max_tokens": 16,
+      "extra": {"reasoning_effort": "minimal"}
+    },
+    {
+      "name": "openrouter-gemini-3.8-flash",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "model": "google/gemini-3.8-flash",
+      "modes": ["text", "image", "image+audio"],
+      "max_tokens": 16,
+      "extra": {"reasoning_effort": "minimal"}
+    },
+    {
+      "name": "openrouter-muse-spark-1.3",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "model": "meta/muse-spark-1.3",
+      "modes": ["text", "audio", "image+audio"],
+      "max_tokens": 16,
+      "extra": {"reasoning_effort": "minimal"}
+    },
+    {
+      "name": "openrouter-deepseek-v4-flash-vision",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "model": "deepseek/deepseek-v4-flash-vision-exp",
+      "modes": ["text", "image"],
+      "max_tokens": 16,
+      "extra": {"reasoning_effort": "low"}
+    },
+    {
+      "name": "direct-openai-astra-pro",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY",
+      "model": "gpt-6-astra-pro",
+      "modes": ["text", "image"],
+      "max_tokens": 16,
+      "audio_data_uri": true
+    }
+  ]
+}

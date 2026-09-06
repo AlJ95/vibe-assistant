@@ -20,6 +20,17 @@ def _run(args, check=True):
     subprocess.run(args, check=check, capture_output=True)
 
 
+# Skalierung Bild-Koordinaten → Bildschirm-Koordinaten (wird von der Action-Engine
+# nach jedem Screenshot gesetzt; Default 1:1, falls nichts skaliert wurde).
+_click_scale = (1.0, 1.0)
+
+
+def set_click_scale(sx: float, sy: float):
+    """Setzt die aktuelle Bild→Bildschirm-Skalierung für Klicks."""
+    global _click_scale
+    _click_scale = (float(sx), float(sy))
+
+
 def type_text(text: str):
     """Tippt Text in das fokussierte Fenster."""
     _run(["xdotool", "type", "--clearmodifiers", "--delay", "20", "--", text])
@@ -32,9 +43,10 @@ def press_keys(keys):
 
 
 def click(x: int, y: int, button: str = "left"):
-    """Klickt an Bildschirmkoordinaten."""
+    """Klickt an Bildschirmkoordinaten (Bild-Koordinaten werden skaliert)."""
     btn = {"left": "1", "middle": "2", "right": "3"}.get(str(button).lower(), "1")
-    _run(["xdotool", "mousemove", str(int(x)), str(int(y))])
+    sx, sy = _click_scale
+    _run(["xdotool", "mousemove", str(int(round(x * sx))), str(int(round(y * sy)))])
     _run(["xdotool", "click", btn])
 
 

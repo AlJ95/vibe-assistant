@@ -1,4 +1,10 @@
-"""Action-Engine: DeepSeek V4 Vision + Tool-Calling, mehrstufige Agent-Schleife."""
+"""Action-Engine: Vision-Modell + Tool-Calling, mehrstufige Agent-Schleife.
+
+Latenz-Optimierungen:
+- Stabile Prefix-Ordnung (System-Prompt + Tools zuerst, Bild zuletzt) → Prompt-Caching.
+- Mehrere tool_calls pro Antwort werden erlaubt/gefördert → weniger API-Runden.
+- JPEG-Screenshots (klein) + Klick-Koordinaten-Skalierung Bild → Bildschirm.
+"""
 import base64
 import json
 
@@ -19,7 +25,7 @@ TOOLS = [
     }},
     {"type": "function", "function": {
         "name": "click",
-        "description": "Klickt an Bildschirmkoordinaten (aus dem Screenshot ableitbar).",
+        "description": "Klickt an Bildschirmkoordinaten. Koordinaten relativ zum sichtbaren Screenshot angeben.",
         "parameters": {"type": "object", "properties": {
             "x": {"type": "integer"}, "y": {"type": "integer"},
             "button": {"type": "string", "enum": ["left", "middle", "right"]}},
@@ -56,7 +62,7 @@ SYSTEM_PROMPT = (
     "(transkribierte Sprachäußerung) und einen Screenshot des aktuellen Desktops.\n"
     "Arbeite die Aufgabe in Schritten ab:\n"
     "1. Analysiere den aktuellen Screenshot.\n"
-    "2. Rufe genau EIN Tool auf, das den nächsten sinnvollen Schritt ausführt.\n"
+    "2. Rufe die Tool(s) auf, die den nächsten sinnvollen Schritt ausführen.\n"
     "3. Du bekommst danach einen neuen Screenshot und machst den nächsten Schritt.\n"
     "4. Wiederhole, bis die Aufgabe vollständig erledigt ist.\n"
     "5. Wenn die Aufgabe erledigt ist, rufe task_finished mit einer kurzen Zusammenfassung auf.\n"
@@ -66,24 +72,33 @@ SYSTEM_PROMPT = (
     "- Tastenkombination → press_keys.\n"
     "- Klick auf ein sichtbares UI-Element → click mit Koordinaten aus dem Screenshot.\n"
     "- Fenster fokussieren → focus_window.\n"
-    "- Mehrschrittige Aufgaben (z. B. \"öffne Firefox und geh zu Gmail\") in mehreren "
-    "Schritten abarbeiten und erst am Ende task_finished aufrufen.\n"
+    "- Latenz: Wenn mehrere Aktionen sicher direkt hintereinander ausführbar sind, ohne "
+    "dass du den Bildschirm dazwischen prüfen musst (z. B. Text tippen und danach Enter, "
+    "oder eine App öffnen und sofort tippen), gib sie in EINER Antwort als MEHRERE "
+    "tool_calls zurück. Bei unsicheren Klick-Koordinaten oder wenn ein Zustand erst "
+    "sichtbar werden muss, nur EIN Tool pro Antwort aufrufen und den neuen Screenshot abwarten.\n"
+    "- Mehrschrittige Aufgaben (z. B. \"öffne Firefox und geh zu Gmail\") erst am Ende mit "
+    "task_finished abschließen.\n"
     "Antworte auf Deutsch."
 )
 
 
-def _img(png: bytes) -> dict:
+def _img(data: bytes) -> dict:
+    mime = getattr(screenshot, "IMAGE_MIME", "image/jpeg")
     return {"type": "image_url",
-            "image_url": {"url": "data:image/png;base64," + base64.b64encode(png).decode()}}
+            "image_url": {"url": f"data:{mime};base64," + base64.b64encode(data).decode()}}
 
 
-def run_task(transcribed_text: str, screenshot_png: bytes, max_steps: int = 10) -> str:
+def run_task(transcribed_text: str, screenshot_data: bytes, scale=(1.0, 1.0),
+             max_steps: int = 10) -> str:
     """Mehrstufige Computer-Use-Schleife. Gibt die Abschluss-Zusammenfassung zurück."""
+    executor.set_click_scale(*scale)  # Klick-Koordinaten des ersten Bildes korrekt mappen
+
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": [
             {"type": "text", "text": f"Aufgabe: \"{transcribed_text}\""},
-            _img(screenshot_png),
+            _img(screenshot_data),
         ]},
     ]
 
@@ -136,9 +151,10 @@ def run_task(transcribed_text: str, screenshot_png: bytes, max_steps: int = 10) 
             break
 
         try:
-            img = screenshot.capture_png()
+            img, sx, sy = screenshot.capture()
+            executor.set_click_scale(sx, sy)
         except Exception:
-            img = screenshot_png
+            img = screenshot_data
         messages.append({
             "role": "user",
             "content": [

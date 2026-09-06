@@ -12,10 +12,12 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
 # --- Modelle ---
-# Hinweis: "muse-spark-1.3-contributor" ist durch die OpenRouter-Privacy-Einstellung
-# ("paid model training") blockiert → Standard ist die Nicht-Contributor-Variante.
-ASR_MODEL = os.getenv("ASR_MODEL", "meta/muse-spark-1.3")
-ACTION_MODEL = os.getenv("ACTION_MODEL", "deepseek/deepseek-v4-flash-vision-exp")
+# ASR läuft lokal (whisper.cpp, CUDA) = Default → minimale Latenz, kein Netz.
+# Fallback "openrouter" nutzt ein Audio-fähiges Omni-Modell (ASR_MODEL).
+ASR_BACKEND = os.getenv("ASR_BACKEND", "local")           # "local" | "openrouter"
+WHISPER_SERVER_URL = os.getenv("WHISPER_SERVER_URL", "http://127.0.0.1:8080")
+ASR_MODEL = os.getenv("ASR_MODEL", "meta/muse-spark-1.3")  # nur openrouter-Backend
+ACTION_MODEL = os.getenv("ACTION_MODEL", "openai/gpt-6-astra-pro")
 
 # --- Audio (portabel: Device wird auto-detektiert, per AUDIO_DEVICE übersteuerbar) ---
 SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", "16000"))
@@ -24,17 +26,18 @@ AUDIO_DEVICE = os.getenv("AUDIO_DEVICE", "") or None
 
 # --- VAD (Silero v5) ---
 VAD_THRESHOLD = float(os.getenv("VAD_THRESHOLD", "0.5"))
-VAD_MIN_SILENCE_MS = int(os.getenv("VAD_MIN_SILENCE_MS", "600"))   # Hangover
-VAD_SPEECH_PAD_MS = int(os.getenv("VAD_SPEECH_PAD_MS", "30"))      # Pre-/Post-Roll
-VAD_MAX_SPEECH_S = int(os.getenv("VAD_MAX_SPEECH_S", "30"))        # Max. Äußerungslänge
-VAD_WINDOW_SAMPLES = 512                                           # 32 ms @ 16 kHz
+VAD_MIN_SILENCE_MS = int(os.getenv("VAD_MIN_SILENCE_MS", "350"))  # Hangover (Latenz!)
+VAD_SPEECH_PAD_MS = int(os.getenv("VAD_SPEECH_PAD_MS", "30"))     # Pre-/Post-Roll
+VAD_MAX_SPEECH_S = int(os.getenv("VAD_MAX_SPEECH_S", "30"))       # Max. Äußerungslänge
+VAD_WINDOW_SAMPLES = 512                                          # 32 ms @ 16 kHz
 
 # --- Pfade ---
 MODEL_DIR = BASE_DIR / "models"
 VAD_MODEL_PATH = MODEL_DIR / "silero_vad.onnx"
 
-# --- Screenshot ---
-SCREENSHOT_MAX_WIDTH = int(os.getenv("SCREENSHOT_MAX_WIDTH", "1920"))
+# --- Screenshot (JPEG für kleine Payloads = weniger Latenz) ---
+SCREENSHOT_MAX_WIDTH = int(os.getenv("SCREENSHOT_MAX_WIDTH", "1280"))
+SCREENSHOT_QUALITY = int(os.getenv("SCREENSHOT_QUALITY", "80"))
 
 # --- Shell-Whitelist für run_command (kommagetrennte Präfixe; leer = alles blockiert) ---
 ALLOWED_COMMAND_PREFIXES = [p for p in os.getenv("ALLOWED_COMMANDS", "").split(",") if p]
