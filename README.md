@@ -2,12 +2,12 @@
 
 Voice → Desktop-Action Agent für Ubuntu (X11). Python-Paket: `desktop_assistant`. Dauerläufer mit Tray-Icon: nimmt 24/7 auf,
 erkennt per Silero-VAD Sprache, transkribiert LOKAL über whisper.cpp (CUDA) und führt
-Desktop-Aktionen via GPT-6 Astra Pro (Tool-Calling) + xdotool aus.
+Desktop-Aktionen via Vision-Modell (Default: Gemma 4 31B, per Tray-Menü wählbar) + xdotool aus.
 
 ## Datenfluss
 
     Mikrofon → Capture (sounddevice) → VAD (Silero v5) → ASR (lokal: whisper.cpp CUDA)
-        → Screenshot (JPEG, parallel zur ASR) + Action-Engine (GPT-6 Astra Pro) → Executor (xdotool) → Desktop
+        → Screenshot (JPEG, parallel zur ASR) + Action-Engine (Vision-Modell) → Executor (xdotool) → Desktop
 
 - VAD läuft lokal (Silero ONNX, CPU < 1 %).
 - Bei erkannter Sprache: WAV-Segment → ASR (lokal whisper.cpp; Fallback OpenRouter) → Text.
@@ -50,8 +50,8 @@ speech-to-paste-README; danach pro Sitzung starten):
 
 ASR-Fallback auf OpenRouter: `ASR_BACKEND=openrouter` in der .env setzen.
 
-Tray-Menü: **Aktiviert** (Checkbox, Default an) / **Beenden**. Icon-Farbe = Zustand
-(grün = aktiv, grau = deaktiviert).
+Tray-Menü: **Aktiviert** (Checkbox, Default an) / **Modell** (Action-Modell wählen) / **Beenden**.
+Icon-Farbe = Zustand (grün = aktiv, grau = deaktiviert), Tooltip zeigt das aktive Modell.
 
 ## Feedback (Töne + Toast)
 
@@ -68,7 +68,7 @@ Genau zwei akustische Signale, sonst keine:
 | `ASR_BACKEND` | `local` | `local` = whisper.cpp-Server, `openrouter` = Cloud-Fallback |
 | `WHISPER_SERVER_URL` | `http://127.0.0.1:8080` | Adresse des lokalen whisper.cpp-Servers |
 | `ASR_MODEL` | `meta/muse-spark-1.3` | nur openrouter-Backend (Audio-fähig) |
-| `ACTION_MODEL` | `openai/gpt-6-astra-pro` | Vision-Modell für Tool-Calling |
+| `ACTION_MODEL` | `google/gemma-4-31b-it` | Action-Modell (per Tray-Menü „Modell" wählbar) |
 | `AUDIO_DEVICE` | leer (System-Default) | Aufnahmequelle (Index oder Name) |
 | `VAD_THRESHOLD` | `0.5` | Sprach-Schwelle |
 | `VAD_MIN_SILENCE_MS` | `350` | Ende-der-Äußerung-Hangover |
@@ -104,7 +104,7 @@ OpenAI-kompatible Endpunkte): `benchmarks/latency_bench.py` + `README.md`.
       audio.py           sounddevice + Silero-VAD (stateful v5)
       asr.py             lokal whisper.cpp-Server (Fallback: OpenRouter Omni)
       screenshot.py      scrot / PIL → JPEG + Klick-Skalierung
-      action_engine.py   GPT-6 Astra Pro + Tool-Calling (Mehrfach-Calls)
+      action_engine.py   Vision-Modell + Tool-Calling (Mehrfach-Calls)
       executor.py        xdotool (Klick-Koordinaten werden skaliert)
       openrouter.py      requests-Session (keep-alive) + Retry
       feedback.py        Töne (Task-Start/Ende) + Toast (notify-send)

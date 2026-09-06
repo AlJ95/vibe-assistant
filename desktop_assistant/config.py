@@ -17,7 +17,16 @@ OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/ap
 ASR_BACKEND = os.getenv("ASR_BACKEND", "local")           # "local" | "openrouter"
 WHISPER_SERVER_URL = os.getenv("WHISPER_SERVER_URL", "http://127.0.0.1:8080")
 ASR_MODEL = os.getenv("ASR_MODEL", "meta/muse-spark-1.3")  # nur openrouter-Backend
-ACTION_MODEL = os.getenv("ACTION_MODEL", "openai/gpt-6-astra-pro")
+ACTION_MODEL = os.getenv("ACTION_MODEL", "google/gemma-4-31b-it")
+
+# Auswahl der Action-Modelle im Tray-Menü (Slug, Anzeigename).
+ACTION_MODELS = [
+    ("google/gemma-4-31b-it", "Gemma 4 31B"),
+    ("anthropic/claude-opus-5", "Claude Opus 5"),
+    ("google/gemini-3.8-flash", "Gemini 3.8 Flash"),
+    ("openai/gpt-6-astra-pro", "GPT-6 Astra Pro"),
+    ("deepseek/deepseek-v4-flash-vision-exp", "DeepSeek V4 Flash Vision"),
+]
 
 # --- Audio (portabel: Device wird auto-detektiert, per AUDIO_DEVICE übersteuerbar) ---
 SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", "16000"))

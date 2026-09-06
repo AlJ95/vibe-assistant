@@ -1,0 +1,26 @@
+{
+  "audio": "/tmp/test_speech.wav",
+  "runs": 3,
+  "pipelines": [
+    {
+      "name": "whisper -> claude-opus-5 (Referenz)",
+      "action": {"base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY",
+                 "model": "anthropic/claude-opus-5", "extra": {"reasoning_effort": "minimal"}}
+    },
+    {
+      "name": "whisper -> qwen3-vl-30b-a3b-instruct",
+      "action": {"base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY",
+                 "model": "qwen/qwen3-vl-30b-a3b-instruct"}
+    },
+    {
+      "name": "whisper -> gemma-4-31b-it",
+      "action": {"base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY",
+                 "model": "google/gemma-4-31b-it"}
+    },
+    {
+      "name": "omni inkling-small",
+      "omni": {"base_url": "https://openrouter.ai/api/v1", "api_key_env": "OPENROUTER_API_KEY",
+               "model": "thinkingmachines/inkling-small"}
+    }
+  ]
+}

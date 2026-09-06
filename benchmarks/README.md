@@ -1,8 +1,50 @@
-# Latency-Benchmark (Screenshot + Audio)
+# Benchmarks
 
-Misst die End-to-End-Latenz der Vibe-Assistant-Pipeline gegen beliebige
-OpenAI-kompatible Chat-APIs — mit denselben Payloads wie im Echtbetrieb:
-ein echter Desktop-Screenshot (JPEG, skaliert) und ein Audio-Clip (WAV 16 kHz).
+Zwei Tools:
+
+1. **`e2e_bench.py`** — der maßgebliche Benchmark. Misst eine komplette
+   Agent-Runde End-to-End mit den ECHTEN App-Komponenten (echte Tool-Schemas +
+   System-Prompt der Action-Engine, echter Screenshot, echte Sprachdatei,
+   lokale Whisper-ASR). → siehe unten „End-to-End-Latenz".
+2. **`latency_bench.py`** — Low-Level-Sonde. Misst isolierte Medien-Payloads
+   (text/image/audio/image+audio) gegen beliebige OpenAI-kompatible Endpunkte,
+   um Komponenten-Overhead zu isolieren (z. B. „was kostet das Bild im Prefill?").
+   Für die echte Projektentscheidung ist **e2e_bench** maßgeblich.
+
+---
+
+## End-to-End-Latenz (`e2e_bench.py`)
+
+Misst eine KOMPLETTE Runde, vom Task-Start bis zur ersten Antwort/Tool-Call des
+Action-Modells — genau die Pipeline des Projekts:
+
+    Variante A (2 Calls): VAD-Capture → ASR (lokal whisper.cpp) → Action-Modell (Text+Image)
+    Variante B (1 Call):   Omni-Modell verarbeitet Audio+Image+Text direkt → Tool-Call
+
+Keine künstlichen Modi. Nur Modelle, die die Modalität können (Vision+Tools für
+Action; Audio+Vision+Tools für Omni).
+
+    uv run python benchmarks/e2e_bench.py --config benchmarks/e2e.example.json --runs 3
+    uv run python benchmarks/e2e_bench.py --config ... --only astra --json /tmp/e2e.json
+
+Voraussetzung für Variante A: whisper-server läuft (`ASR_BACKEND=local`).
+
+Gemessene Metriken je Runde:
+| Metrik    | Bedeutung                                                        |
+|-----------|------------------------------------------------------------------|
+| asr_time  | Zeit der lokalen Transkription (nur Variante A)                  |
+| e2e_ttft  | Task-Start → erste Action-Antwort (Tool-Call/Content) — **die relevante Zahl** |
+| e2e_total | Task-Start → Antwort abgeschlossen                               |
+
+Config (`e2e.example.json`): Liste von `pipelines`. Jede hat entweder `action`
+(lokale ASR + Action-Modell) oder `omni` (Ein-Call). Provider-Felder wie bei
+`latency_bench`: `base_url`, `api_key_env`, `model`, `extra`, `audio_data_uri`.
+
+---
+
+## Low-Level-Sonde (`latency_bench.py`)
+
+Misst TTFT/Total einzelner Medien-Payloads (OpenAI-kompatibel):
 
 ## Was gemessen wird
 

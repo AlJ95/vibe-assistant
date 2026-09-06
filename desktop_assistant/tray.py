@@ -1,6 +1,15 @@
-"""Tray-Icon (pystray + AppIndicator): Aktiviert/Deaktiviert/Beenden."""
+"""Tray-Icon (pystray + AppIndicator): Aktiviert/Deaktiviert/Modell/Beenden."""
 import pystray
 from PIL import Image, ImageDraw
+
+from . import config
+
+
+def _model_label(slug: str) -> str:
+    for s, label in config.ACTION_MODELS:
+        if s == slug:
+            return label
+    return slug
 
 
 class Tray:
@@ -11,9 +20,12 @@ class Tray:
         self.icon = pystray.Icon(
             "desktop-assistant",
             icon=self._make_icon(self.active),
-            title="Desktop Assistant",
+            title=self._title(),
             menu=self._build_menu(),
         )
+
+    def _title(self) -> str:
+        return f"Vibe Assistant — {_model_label(config.ACTION_MODEL)}"
 
     def _make_icon(self, active):
         img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
@@ -24,15 +36,30 @@ class Tray:
         return img
 
     def _build_menu(self):
-        return pystray.Menu(
+        model_items = [
             pystray.MenuItem(
-                "Aktiviert",
-                self._toggle_active,
-                checked=lambda item: self.active,
-            ),
+                label,
+                self._make_model_cb(slug),
+                checked=lambda item, s=slug: config.ACTION_MODEL == s,
+                radio=True,
+            )
+            for slug, label in config.ACTION_MODELS
+        ]
+        return pystray.Menu(
+            pystray.MenuItem("Aktiviert", self._toggle_active,
+                             checked=lambda item: self.active),
+            pystray.MenuItem("Modell", pystray.Menu(*model_items)),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Beenden", self._quit),
         )
+
+    def _make_model_cb(self, slug):
+        def cb(icon, item):
+            config.ACTION_MODEL = slug
+            icon.title = self._title()
+            icon.update_menu()
+            print(f"[tray] Action-Modell: {slug}")
+        return cb
 
     def _toggle_active(self, icon, item):
         self.active = not self.active

@@ -155,7 +155,8 @@ def _measure(provider: dict, prompt: str, mode: str, image: bytes | None,
 
     session = requests.Session()
     t0 = time.perf_counter()
-    ttft = None          # Zeit bis erstes content/tool_delta
+    ttft = None          # Zeit bis erstes content/tool/reasoning-Delta
+    first_delta = None   # Zeit bis irgendein Delta (Fallback für TTFT)
     content_chars = 0
     usage_tokens = None
     error = None
@@ -179,26 +180,24 @@ def _measure(provider: dict, prompt: str, mode: str, image: bytes | None,
                         chunk = json.loads(payload)
                     except json.JSONDecodeError:
                         continue
-                    if ttft is None:
-                        try:
-                            delta = chunk["choices"][0]["delta"] or {}
-                        except (KeyError, IndexError):
-                            delta = {}
-                        if delta.get("content") or delta.get("tool_calls") \
-                                or delta.get("reasoning") or delta.get("reasoning_content"):
-                            ttft = time.perf_counter() - t0
-                    # Content sammeln für Token-Schätzung
                     try:
-                        d = chunk["choices"][0].get("delta") or {}
-                        content_chars += len(d.get("content") or "")
+                        delta = chunk["choices"][0].get("delta") or {}
                     except (KeyError, IndexError):
-                        pass
+                        delta = {}
+                    if delta and first_delta is None:
+                        first_delta = time.perf_counter() - t0
+                    if ttft is None and (delta.get("content") or delta.get("tool_calls")
+                                         or delta.get("reasoning") or delta.get("reasoning_content")):
+                        ttft = time.perf_counter() - t0
+                    content_chars += len(delta.get("content") or "")
                     usage = chunk.get("usage")
                     if usage:
                         usage_tokens = usage.get("completion_tokens")
     except requests.RequestException as e:
         error = f"Netzwerkfehler: {e}"
     total = time.perf_counter() - t0
+    if ttft is None:
+        ttft = first_delta  # nur Reasoning/leere Deltas gesehen → erstes Event als TTFT
 
     return {
         "ok": error is None,
@@ -251,9 +250,12 @@ def run_benchmark(cfg: dict, only: str | None, runs: int, timeout: int,
             for i in range(runs):
                 r = _measure(p, prompt, mode, image, audio, timeout)
                 if r["ok"]:
-                    ttfts.append(r["ttft"])
-                    totals.append(r["total"])
-                    row.setdefault("tokens", r["tokens"])
+                    if r["ttft"] is not None:
+                        ttfts.append(r["ttft"])
+                    if r["total"] is not None:
+                        totals.append(r["total"])
+                    if r["tokens"] is not None:
+                        row.setdefault("tokens", r["tokens"])
                 else:
                     errs.append(r["error"])
             row["runs"] = runs
