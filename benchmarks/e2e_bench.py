@@ -73,7 +73,8 @@ def local_asr(audio_bytes: bytes) -> str:
     r = requests.post(
         app_config.WHISPER_SERVER_URL + "/inference",
         files={"file": ("audio.wav", audio_bytes, "audio/wav")},
-        data={"temperature": "0", "response_format": "json"},
+        data={"temperature": "0", "response_format": "json",
+              "language": app_config.ASR_LANGUAGE},
         timeout=60,
     )
     r.raise_for_status()

@@ -67,6 +67,7 @@ Genau zwei akustische Signale, sonst keine:
 | `OPENROUTER_API_KEY` | — | API-Key (nur für Action-Engine/Fallback) |
 | `ASR_BACKEND` | `local` | `local` = whisper.cpp-Server, `openrouter` = Cloud-Fallback |
 | `WHISPER_SERVER_URL` | `http://127.0.0.1:8080` | Adresse des lokalen whisper.cpp-Servers |
+| `ASR_LANGUAGE` | `de` | Erzwungene Whisper-Sprache (deterministisch, kein Auto-Detect) |
 | `ASR_MODEL` | `meta/muse-spark-1.3` | nur openrouter-Backend (Audio-fähig) |
 | `ACTION_MODEL` | `google/gemma-4-31b-it` | Action-Modell (per Tray-Menü „Modell" wählbar) |
 | `AUDIO_DEVICE` | leer (System-Default) | Aufnahmequelle (Index oder Name) |

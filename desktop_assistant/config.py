@@ -16,6 +16,7 @@ OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/ap
 # Fallback "openrouter" nutzt ein Audio-fähiges Omni-Modell (ASR_MODEL).
 ASR_BACKEND = os.getenv("ASR_BACKEND", "local")           # "local" | "openrouter"
 WHISPER_SERVER_URL = os.getenv("WHISPER_SERVER_URL", "http://127.0.0.1:8080")
+ASR_LANGUAGE = os.getenv("ASR_LANGUAGE", "de")            # deterministische Whisper-Sprache
 ASR_MODEL = os.getenv("ASR_MODEL", "meta/muse-spark-1.3")  # nur openrouter-Backend
 ACTION_MODEL = os.getenv("ACTION_MODEL", "google/gemma-4-31b-it")
 

@@ -16,16 +16,26 @@ SYSTEM_PROMPT = (
 )
 
 
+def _dedupe_lines(text: str) -> str:
+    """Entfernt aufeinanderfolgende identische Zeilen (whisper-Halluzination)."""
+    out = []
+    for line in text.splitlines():
+        line = line.strip()
+        if line and (not out or line != out[-1]):
+            out.append(line)
+    return "\n".join(out)
+
+
 def _local_transcribe(wav_bytes: bytes) -> str:
     """Whisper.cpp-Server (/inference): WAV → Text, komplett lokal."""
     files = {"file": ("audio.wav", wav_bytes, "audio/wav")}
-    data = {"temperature": "0", "response_format": "json"}
+    data = {"temperature": "0", "response_format": "json", "language": config.ASR_LANGUAGE}
     r = requests.post(
         config.WHISPER_SERVER_URL + "/inference",
         files=files, data=data, timeout=30,
     )
     r.raise_for_status()
-    return (r.json().get("text") or "").strip()
+    return _dedupe_lines(r.json().get("text") or "")
 
 
 def _remote_transcribe(wav_bytes: bytes) -> str:
