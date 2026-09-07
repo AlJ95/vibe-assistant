@@ -7,6 +7,7 @@ Latenz-Optimierungen:
 """
 import base64
 import json
+import time
 
 from . import config, executor, openrouter, screenshot
 
@@ -93,6 +94,8 @@ def run_task(transcribed_text: str, screenshot_data: bytes, scale=(1.0, 1.0),
              max_steps: int = 10) -> str:
     """Mehrstufige Computer-Use-Schleife. Gibt die Abschluss-Zusammenfassung zurück."""
     executor.set_click_scale(*scale)  # Klick-Koordinaten des ersten Bildes korrekt mappen
+    t_task = time.perf_counter()
+    print(f"[agent] Aufgabe: {transcribed_text!r} | Modell: {config.ACTION_MODEL}")
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -104,17 +107,24 @@ def run_task(transcribed_text: str, screenshot_data: bytes, scale=(1.0, 1.0),
 
     summary = ""
     for step in range(max_steps):
+        t0 = time.perf_counter()
         data = openrouter.chat(
             model=config.ACTION_MODEL, messages=messages,
             tools=TOOLS, tool_choice="auto", max_tokens=1024,
             extra={"reasoning_effort": "low"},
         )
+        dt = time.perf_counter() - t0
         msg = data["choices"][0]["message"]
         tool_calls = msg.get("tool_calls") or []
+        print(f"[agent] Step {step + 1}: API-Call {dt:.1f}s, "
+              f"{len(tool_calls)} Tool-Call(s)")
 
         if not tool_calls:
             if msg.get("content"):
                 summary = msg["content"].strip()
+                print(f"[agent] Step {step + 1}: keine Tool-Calls — Antwort: {summary[:120]!r}")
+            else:
+                print(f"[agent] Step {step + 1}: keine Tool-Calls, kein Content — Ende")
             break
 
         messages.append({
@@ -139,22 +149,29 @@ def run_task(transcribed_text: str, screenshot_data: bytes, scale=(1.0, 1.0),
                 summary = args.get("summary", "")
                 done = True
                 messages.append({"role": "tool", "tool_call_id": tc["id"], "content": "ok"})
+                print(f"[agent]   → task_finished: {summary!r}")
                 break
+            print(f"[agent]   → ausführen: {name}({args})")
+            t_exec = time.perf_counter()
             try:
                 executor.execute(name, args)
                 result = "ok"
             except Exception as e:
-                result = f"Fehler: {e}"
+                result = f"Fehler: {type(e).__name__}: {e}"
+            print(f"[agent]   ← {name}: {result[:100]} ({time.perf_counter() - t_exec:.2f}s)")
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
 
         if done:
             break
 
+        t_shot = time.perf_counter()
         try:
             img, sx, sy = screenshot.capture()
             executor.set_click_scale(sx, sy)
         except Exception:
             img = screenshot_data
+        print(f"[agent]   Screenshot nach Aktion ({time.perf_counter() - t_shot:.2f}s, "
+              f"{len(img) // 1024} KB)")
         messages.append({
             "role": "user",
             "content": [
@@ -163,4 +180,6 @@ def run_task(transcribed_text: str, screenshot_data: bytes, scale=(1.0, 1.0),
             ],
         })
 
+    print(f"[agent] Loop-Ende nach {time.perf_counter() - t_task:.1f}s "
+          f"(max_steps={max_steps}) | summary: {summary[:120]!r}")
     return summary

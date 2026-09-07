@@ -71,10 +71,20 @@ def open_app(name: str):
     if shutil.which("gtk-launch"):
         r = subprocess.run(["gtk-launch", name], capture_output=True)
         if r.returncode == 0:
+            print(f"[executor] gtk-launch {name!r} OK")
             return
-    subprocess.Popen(
-        [name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        start_new_session=True,
+        print(f"[executor] gtk-launch {name!r} fehlgeschlagen (rc={r.returncode}, "
+              f"stderr={r.stderr.decode(errors='ignore')[:100]})")
+    if shutil.which(name):
+        subprocess.Popen(
+            [name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        print(f"[executor] {name!r} als Befehl gestartet")
+        return
+    raise FileNotFoundError(
+        f"Anwendung {name!r} nicht gefunden (weder Desktop-Eintrag via gtk-launch "
+        f"noch Befehl im PATH)"
     )
 
 

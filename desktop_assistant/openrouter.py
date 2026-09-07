@@ -35,6 +35,7 @@ def chat(messages, model=None, tools=None, tool_choice=None, max_tokens=512,
 
     last = None
     for attempt in range(retries):
+        t0 = time.perf_counter()
         try:
             r = _session.post(
                 config.OPENROUTER_BASE_URL + "/chat/completions",
@@ -44,10 +45,14 @@ def chat(messages, model=None, tools=None, tool_choice=None, max_tokens=512,
             # Netzwerkfehler (z. B. Connection-Reset): kurz warten, erneut versuchen
             last = e
             if attempt < retries - 1:
+                dt = time.perf_counter() - t0
+                print(f"[openrouter] {body['model']} Netzwerkfehler nach {dt:.1f}s "
+                      f"({type(e).__name__}) → Retry {attempt + 2}/{retries}")
                 time.sleep(1.0 * (attempt + 1))
                 continue
             raise RuntimeError(f"OpenRouter: Netzwerkfehler: {e}") from e
 
+        dt = time.perf_counter() - t0
         if r.status_code in (429, 500, 502, 503, 504) and attempt < retries - 1:
             last = r
             # Retry-After-Header respektieren, sonst kurzes Backoff
@@ -55,9 +60,13 @@ def chat(messages, model=None, tools=None, tool_choice=None, max_tokens=512,
                 wait = float(r.headers.get("Retry-After", 0)) or 1.0 * (attempt + 1)
             except ValueError:
                 wait = 1.0 * (attempt + 1)
-            time.sleep(min(wait, 10))
+            wait = min(wait, 10)
+            print(f"[openrouter] {body['model']} HTTP {r.status_code} nach {dt:.1f}s "
+                  f"→ Retry {attempt + 2}/{retries} in {wait:.0f}s")
+            time.sleep(wait)
             continue
         r.raise_for_status()
+        print(f"[openrouter] {body['model']} → HTTP {r.status_code} in {dt:.1f}s")
         return r.json()
 
     if last is not None:

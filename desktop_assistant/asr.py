@@ -3,6 +3,7 @@
 Lokales Backend minimiert die Latenz: kein Netzwerk-Roundtrip, keine Cloud-Kosten.
 """
 import base64
+import time
 
 import requests
 
@@ -60,9 +61,17 @@ def _remote_transcribe(wav_bytes: bytes) -> str:
 
 def transcribe(wav_bytes: bytes) -> str:
     """WAV → Text, je nach ASR_BACKEND ('local' = Default, 'openrouter')."""
+    t0 = time.perf_counter()
     if config.ASR_BACKEND == "local":
         try:
-            return _local_transcribe(wav_bytes)
+            text = _local_transcribe(wav_bytes)
+            print(f"[asr] lokal (whisper) in {time.perf_counter() - t0:.1f}s → "
+                  f"{len(text)} Zeichen")
+            return text
         except Exception as e:
-            print(f"[asr] lokale Transkription fehlgeschlagen ({e}) — Fallback OpenRouter")
-    return _remote_transcribe(wav_bytes)
+            print(f"[asr] lokal FEHLER ({type(e).__name__}: {e}) nach "
+                  f"{time.perf_counter() - t0:.1f}s → Fallback OpenRouter")
+    text = _remote_transcribe(wav_bytes)
+    print(f"[asr] openrouter ({config.ASR_MODEL}) in {time.perf_counter() - t0:.1f}s → "
+          f"{len(text)} Zeichen")
+    return text
