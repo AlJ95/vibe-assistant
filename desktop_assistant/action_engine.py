@@ -39,6 +39,16 @@ TOOLS = [
                        "required": ["name"]},
     }},
     {"type": "function", "function": {
+        "name": "wait_for",
+        "description": "Wartet, bis eine gestartete Anwendung wirklich bereit ist (Fenster sichtbar oder Prozess läuft). IMMER nach open_app nutzen, wenn die App Zeit zum Laden braucht (z. B. Blender, Firefox, große IDEs, Spiele) — nicht sofort klicken oder tippen, sonst geht die Eingabe ins Leere. Prüft alle 0,5 s; timeout in Sekunden (Standard 15, max 30). Bei Erfolg oder Timeout kommt eine Statusmeldung zurück.",
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string",
+                     "description": "App-Name bzw. Fenstername-Fragment, z. B. 'blender'"},
+            "timeout": {"type": "integer",
+                        "description": "Maximale Wartezeit in Sekunden (Standard 15)"}},
+            "required": ["name"]},
+    }},
+    {"type": "function", "function": {
         "name": "focus_window",
         "description": "Fokussiert ein Fenster per Namensfragment.",
         "parameters": {"type": "object", "properties": {"name": {"type": "string"}},
@@ -69,7 +79,9 @@ SYSTEM_PROMPT = (
     "5. Wenn die Aufgabe erledigt ist, rufe task_finished mit einer kurzen Zusammenfassung auf.\n"
     "Regeln:\n"
     "- Reines Diktat / Text → type_text.\n"
-    "- Anwendung öffnen → open_app.\n"
+    "- Anwendung öffnen → open_app. Danach, wenn die App Zeit zum Laden braucht "
+    "(z. B. Blender, Firefox, IDEs): mit wait_for auf sie warten, bevor du klickst "
+    "oder tippst.\n"
     "- Tastenkombination → press_keys.\n"
     "- Klick auf ein sichtbares UI-Element → click mit Koordinaten aus dem Screenshot.\n"
     "- Fenster fokussieren → focus_window.\n"

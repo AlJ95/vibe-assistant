@@ -2,6 +2,7 @@
 import shlex
 import shutil
 import subprocess
+import time
 
 from . import config
 
@@ -88,6 +89,60 @@ def open_app(name: str):
     )
 
 
+def wait_for(name: str, timeout: int = 15):
+    """Wartet, bis 'name' als Fenster (wmctrl) oder Prozess (pgrep) erscheint.
+
+    Wird nach open_app aufgerufen, wenn eine App Zeit zum Laden braucht.
+    Pollt alle 0,5 s. Sobald der Prozess läuft, wartet sie noch kurz auf ein
+    sichtbares Fenster; kommt keins, meldet sie den Prozess-Status zurück.
+    """
+    name = (name or "").strip()
+    if not name:
+        return "wait_for: kein Name angegeben."
+    try:
+        timeout = max(1, min(int(timeout), 30))
+    except (TypeError, ValueError):
+        timeout = 15
+    deadline = time.monotonic() + timeout
+    started = time.monotonic()
+    proc_seen_at = None
+
+    def _window_seen():
+        try:
+            out = subprocess.run(["wmctrl", "-l"], capture_output=True,
+                                 text=True, timeout=3).stdout
+            return any(name.lower() in ln.lower() for ln in out.splitlines())
+        except Exception:
+            return False
+
+    def _proc_running():
+        try:
+            r = subprocess.run(["pgrep", "-if", name], capture_output=True,
+                               text=True, timeout=3)
+            return r.returncode == 0 and r.stdout.strip() != ""
+        except Exception:
+            return False
+
+    while time.monotonic() < deadline:
+        if _window_seen():
+            return (f"Fenster '{name}' erschienen nach "
+                    f"{time.monotonic() - started:.1f}s — bereit.")
+        if _proc_running():
+            if proc_seen_at is None:
+                proc_seen_at = time.monotonic()
+            # Prozess läuft: noch bis zu 2,5 s aufs Fenster warten
+            if time.monotonic() - proc_seen_at >= 2.5:
+                return (f"Prozess '{name}' läuft seit "
+                        f"{time.monotonic() - started:.1f}s (Fenster noch nicht "
+                        f"sichtbar — Screenshot prüfen, ggf. erneut wait_for).")
+        time.sleep(0.5)
+    if proc_seen_at is not None:
+        return (f"Timeout nach {timeout}s: Prozess '{name}' läuft, aber kein "
+                f"Fenster erschienen — Screenshot prüfen.")
+    return (f"Timeout nach {timeout}s: '{name}' weder als Fenster noch als "
+            f"Prozess gefunden.")
+
+
 def run_command(command: str):
     """Führt ein Shell-Kommando aus (nur bei Whitelist-Treffer)."""
     prefix = command.strip().split()[0] if command.strip() else ""
@@ -105,6 +160,7 @@ _HANDLERS = {
     "press_keys": lambda a: press_keys(a["keys"]),
     "click": lambda a: click(a["x"], a["y"], a.get("button", "left")),
     "open_app": lambda a: open_app(a["name"]),
+    "wait_for": lambda a: wait_for(a.get("name", ""), a.get("timeout", 15)),
     "focus_window": lambda a: focus_window(a["name"]),
     "run_command": lambda a: run_command(a["command"]),
 }
