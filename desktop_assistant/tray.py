@@ -1,4 +1,8 @@
 """Tray-Icon (pystray + AppIndicator): Aktiviert/Deaktiviert/Modell/Beenden."""
+import os
+import threading
+import time
+
 import pystray
 from PIL import Image, ImageDraw
 
@@ -70,7 +74,14 @@ class Tray:
 
     def _quit(self, icon, item):
         self.on_quit()
-        icon.stop()
+        # pystray/AppIndicator: icon.stop() aus dem Callback kann blockieren und
+        # Threads (GTK/Executor) halten den Prozess → Sicherheitsnetz erzwingt Exit.
+        threading.Thread(target=lambda: (time.sleep(1.5), os._exit(0)),
+                         daemon=True).start()
+        try:
+            icon.stop()
+        except Exception as e:
+            print(f"[tray] stop-Fehler: {e}")
 
     def run(self):
         self.icon.run()

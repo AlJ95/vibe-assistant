@@ -60,6 +60,7 @@ def main():
     def on_quit():
         stop.set()
         audio.stop()
+        _shot_pool.shutdown(wait=False)  # Executor-Threads dürfen Exit nicht blockieren
 
     tray = Tray(audio, on_quit)
 

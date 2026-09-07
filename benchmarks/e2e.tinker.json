@@ -1,0 +1,21 @@
+{
+  "audio": "/tmp/test_speech.wav",
+  "runs": 3,
+  "pipelines": [
+    {
+      "name": "omni inkling-small (Tinker direkt)",
+      "omni": {"base_url": "https://tinker.thinkingmachines.dev/services/tinker-prod/oai/api/v1",
+               "api_key_env": "TINKER_API_KEY", "model": "thinkingmachines/Inkling-Small"}
+    },
+    {
+      "name": "omni inkling-small (OpenRouter)",
+      "omni": {"base_url": "https://openrouter.ai/api/v1",
+               "api_key_env": "OPENROUTER_API_KEY", "model": "thinkingmachines/inkling-small"}
+    },
+    {
+      "name": "whisper -> gemma-4-31b-it (Referenz)",
+      "action": {"base_url": "https://openrouter.ai/api/v1",
+                 "api_key_env": "OPENROUTER_API_KEY", "model": "google/gemma-4-31b-it"}
+    }
+  ]
+}
